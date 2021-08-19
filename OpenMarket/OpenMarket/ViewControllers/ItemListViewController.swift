@@ -130,10 +130,6 @@ extension ItemListViewController: UICollectionViewDataSource {
         let marketItem = itemList[indexPath.item]
         cell.configure(with: marketItem)
         
-        cell.layer.borderWidth = 1
-        cell.layer.borderColor = UIColor.lightGray.cgColor
-        cell.layer.cornerRadius = 8
-        
         return cell
     }
 }
