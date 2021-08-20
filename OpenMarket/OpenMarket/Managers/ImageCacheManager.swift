@@ -9,6 +9,7 @@ import UIKit
 
 class ImageCacheManager {
     private let cache = NSCache<NSNumber, UIImage>()
+    private let cacheUrl = NSCache<NSString, UIImage>()
 
     static let shared: ImageCacheManager = ImageCacheManager.init()
     
@@ -23,4 +24,15 @@ class ImageCacheManager {
         let itemNumber = NSNumber(value: key)
         cache.setObject(image, forKey: itemNumber)
     }
+    
+    func loadCachedData(key: String) -> UIImage? {
+        let itemUrl = NSString(string: key)
+        return cacheUrl.object(forKey: itemUrl)
+    }
+    
+    func setData(_ image: UIImage, key: String) {
+        let itemUrl = NSString(string: key)
+        cacheUrl.setObject(image, forKey: itemUrl)
+    }
+    
 }

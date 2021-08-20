@@ -130,7 +130,8 @@ extension ItemListViewController {
             return
         }
         
-        guard let targetUrl = URL(string: self.itemList[index].thumbnails[0]) else {
+        guard let thumbnail = self.itemList[index].thumbnails.first,
+              let targetUrl = URL(string: thumbnail) else {
             return
         }
         
@@ -146,6 +147,7 @@ extension ItemListViewController {
             if let data = data, let image = UIImage(data: data) {
                 ImageCacheManager.shared.setData(image, key: index)
                 let reloadTargetIndexPath = IndexPath(row: index, section: 0)
+                
                 DispatchQueue.main.async {
                     if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(reloadTargetIndexPath) == .some(true) {
                         self.marketItemListCollectionView.reloadItems(at: [reloadTargetIndexPath])
