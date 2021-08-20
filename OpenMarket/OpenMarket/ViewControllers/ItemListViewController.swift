@@ -92,11 +92,11 @@ extension ItemListViewController: UICollectionViewDataSource {
         let marketItem = itemList[indexPath.item]
         cell.configure(with: marketItem)
         
-        if let cachedImage = ImageCacheManager.shared.loadCachedData(key: indexPath.item) {
+        if let cachedImage = ImageCacheManager.shared.loadCachedData(key: marketItem.thumbnails[0]) {
             cell.updateThumbnailImage(to: cachedImage)
         } else {
             cell.updateThumbnailImage(to: nil)
-            downloadImage(at: indexPath.row)
+            downloadImage(at: indexPath.row, with: marketItem.thumbnails[0])
         }
         
         return cell
@@ -106,11 +106,12 @@ extension ItemListViewController: UICollectionViewDataSource {
 extension ItemListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if let cell = cell as? ItemCollectionViewCell {
-            if let cachedImage = ImageCacheManager.shared.loadCachedData(key: indexPath.item) {
+            let marketItem = itemList[indexPath.item]
+            if let cachedImage = ImageCacheManager.shared.loadCachedData(key: marketItem.thumbnails[0]) {
                 cell.updateThumbnailImage(to: cachedImage)
             } else {
                 cell.updateThumbnailImage(to: nil)
-                downloadImage(at: indexPath.row)
+                downloadImage(at: indexPath.row, with: marketItem.thumbnails[0])
             }
         }
     }
@@ -119,14 +120,15 @@ extension ItemListViewController: UICollectionViewDelegate {
 extension ItemListViewController: UICollectionViewDataSourcePrefetching {
     func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
         for indexPath in indexPaths {
-            downloadImage(at: indexPath.item)
+            let marketItem = itemList[indexPath.item]
+            downloadImage(at: indexPath.item, with: marketItem.thumbnails[0])
         }
     }
 }
 
 extension ItemListViewController {
-    func downloadImage(at index: Int) {
-        guard ImageCacheManager.shared.loadCachedData(key: index) == nil else {
+    func downloadImage(at index: Int, with url: String) {
+        guard ImageCacheManager.shared.loadCachedData(key: url) == nil else {
             return
         }
         
@@ -145,7 +147,7 @@ extension ItemListViewController {
             }
             
             if let data = data, let image = UIImage(data: data) {
-                ImageCacheManager.shared.setData(image, key: index)
+                ImageCacheManager.shared.setData(image, key: url)
                 let reloadTargetIndexPath = IndexPath(row: index, section: 0)
                 
                 DispatchQueue.main.async {
