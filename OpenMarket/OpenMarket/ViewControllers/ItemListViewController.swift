@@ -11,7 +11,7 @@ class ItemListViewController: UIViewController {
     private var itemList: [MarketPageItem] = []
     private var nextPage = 1
     
-    private var downloadTasks: [URLSessionTask] = []
+    private var imageDownloadManger = ImageDownloadManager()
     
     @IBOutlet private weak var loadingIndicator: UIActivityIndicatorView!
     @IBOutlet private weak var marketItemListCollectionView: UICollectionView!
@@ -28,8 +28,6 @@ class ItemListViewController: UIViewController {
             switch result {
             case .success(let marketPageItem):
                 if marketPageItem.items.count > 0 {
-                    // Pre Cache
-
                     self.itemList += marketPageItem.items
                     self.nextPage = marketPageItem.page + 1
                     
@@ -40,6 +38,14 @@ class ItemListViewController: UIViewController {
                 }
             case .failure(let error):
                 self.handleError(error)
+            }
+        }
+    }
+    
+    private func reloadCollectionView(with indexPath: IndexPath) {
+        DispatchQueue.main.async {
+            if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(indexPath) == .some(true) {
+                self.marketItemListCollectionView.reloadItems(at: [indexPath])
             }
         }
     }
@@ -96,7 +102,7 @@ extension ItemListViewController: UICollectionViewDataSource {
             cell.updateThumbnailImage(to: cachedImage)
         } else {
             cell.updateThumbnailImage(to: nil)
-            downloadImage(at: indexPath.row, with: marketItem.thumbnails[0])
+            imageDownloadManger.downloadImage(at: indexPath.item, with: marketItem.thumbnails[0], completion: reloadCollectionView(with:))
         }
         
         return cell
@@ -111,7 +117,7 @@ extension ItemListViewController: UICollectionViewDelegate {
                 cell.updateThumbnailImage(to: cachedImage)
             } else {
                 cell.updateThumbnailImage(to: nil)
-                downloadImage(at: indexPath.row, with: marketItem.thumbnails[0])
+                imageDownloadManger.downloadImage(at: indexPath.item, with: marketItem.thumbnails[0], completion: reloadCollectionView(with:))
             }
         }
     }
@@ -121,50 +127,7 @@ extension ItemListViewController: UICollectionViewDataSourcePrefetching {
     func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
         for indexPath in indexPaths {
             let marketItem = itemList[indexPath.item]
-            downloadImage(at: indexPath.item, with: marketItem.thumbnails[0])
+            imageDownloadManger.downloadImage(at: indexPath.item, with: marketItem.thumbnails[0], completion: reloadCollectionView(with:))
         }
-    }
-}
-
-extension ItemListViewController {
-    func downloadImage(at index: Int, with url: String) {
-        guard ImageCacheManager.shared.loadCachedData(key: url) == nil else {
-            return
-        }
-        
-        guard let thumbnail = self.itemList[index].thumbnails.first,
-              let targetUrl = URL(string: thumbnail) else {
-            return
-        }
-        
-        guard !downloadTasks.contains(where: { $0.originalRequest?.url == targetUrl }) else {
-            return
-        }
-        
-        let task = URLSession.shared.dataTask(with: targetUrl) { (data, response, error) in
-            guard error == nil else {
-                return
-            }
-            
-            if let data = data, let image = UIImage(data: data) {
-                ImageCacheManager.shared.setData(image, key: url)
-                let reloadTargetIndexPath = IndexPath(row: index, section: 0)
-                
-                DispatchQueue.main.async {
-                    if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(reloadTargetIndexPath) == .some(true) {
-                        self.marketItemListCollectionView.reloadItems(at: [reloadTargetIndexPath])
-                    }
-                }
-                
-                self.completeTask()
-            }
-        }
-        task.resume()
-        downloadTasks.append(task)
-    }
-    
-    
-    func completeTask() {
-        downloadTasks = downloadTasks.filter { $0.state != .completed }
     }
 }
