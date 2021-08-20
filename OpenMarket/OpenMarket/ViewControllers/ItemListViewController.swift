@@ -8,10 +8,11 @@ import UIKit
 
 class ItemListViewController: UIViewController {
     private let apiClient = ApiClient()
-    private var itemList: [MarketPageItem] = []
-    private var nextPage = 1
-    
     private var imageDownloadManger = ImageDownloadManager()
+    
+    private var nextPage = 1
+    private let preloadCount = 8
+    private var itemList: [MarketPageItem] = []
     
     @IBOutlet private weak var loadingIndicator: UIActivityIndicatorView!
     @IBOutlet private weak var marketItemListCollectionView: UICollectionView!
@@ -43,10 +44,16 @@ class ItemListViewController: UIViewController {
     }
     
     private func reloadCollectionView(with indexPath: IndexPath) {
+//        print(#function, indexPath.item, nextPage)
         DispatchQueue.main.async {
             if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(indexPath) == .some(true) {
                 self.marketItemListCollectionView.reloadItems(at: [indexPath])
             }
+        }
+        
+        if itemList.count - indexPath.item == self.preloadCount {
+//            print("self.fetchItemList()")
+            self.fetchItemList()
         }
     }
     
