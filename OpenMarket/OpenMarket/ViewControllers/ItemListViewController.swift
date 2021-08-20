@@ -11,7 +11,6 @@ class ItemListViewController: UIViewController {
     private var itemList: [MarketPageItem] = []
     private var nextPage = 1
     
-    private let cache = NSCache<NSNumber, UIImage>()
     private var downloadTasks: [URLSessionTask] = []
     
     @IBOutlet private weak var loadingIndicator: UIActivityIndicatorView!
@@ -93,8 +92,7 @@ extension ItemListViewController: UICollectionViewDataSource {
         let marketItem = itemList[indexPath.item]
         cell.configure(with: marketItem)
         
-        let itemNumber = NSNumber(value: indexPath.item)
-        if let cachedImage = self.cache.object(forKey: itemNumber) {
+        if let cachedImage = ImageCacheManager.shared.loadCachedData(key: indexPath.item) {
             cell.updateThumbnailImage(to: cachedImage)
         } else {
             cell.updateThumbnailImage(to: nil)
@@ -108,8 +106,7 @@ extension ItemListViewController: UICollectionViewDataSource {
 extension ItemListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if let cell = cell as? ItemCollectionViewCell {
-            let itemNumber = NSNumber(value: indexPath.item)
-            if let cachedImage = self.cache.object(forKey: itemNumber) {
+            if let cachedImage = ImageCacheManager.shared.loadCachedData(key: indexPath.item) {
                 cell.updateThumbnailImage(to: cachedImage)
             } else {
                 cell.updateThumbnailImage(to: nil)
@@ -129,9 +126,7 @@ extension ItemListViewController: UICollectionViewDataSourcePrefetching {
 
 extension ItemListViewController {
     func downloadImage(at index: Int) {
-        let itemNumber = NSNumber(value: index)
-        
-        guard self.cache.object(forKey: itemNumber) == nil else {
+        guard ImageCacheManager.shared.loadCachedData(key: index) == nil else {
             return
         }
         
@@ -149,7 +144,7 @@ extension ItemListViewController {
             }
             
             if let data = data, let image = UIImage(data: data) {
-                self.cache.setObject(image, forKey: itemNumber)
+                ImageCacheManager.shared.setData(image, key: index)
                 let reloadTargetIndexPath = IndexPath(row: index, section: 0)
                 DispatchQueue.main.async {
                     if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(reloadTargetIndexPath) == .some(true) {
