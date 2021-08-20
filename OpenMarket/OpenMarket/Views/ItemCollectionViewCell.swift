@@ -26,7 +26,6 @@ class ItemCollectionViewCell: UICollectionViewCell {
     }
     
     func configure(with marketItem: MarketPageItem) {
-        updateThumbnailImage(to: marketItem)
         updateLabels(to: marketItem)
     }
     
@@ -96,23 +95,7 @@ class ItemCollectionViewCell: UICollectionViewCell {
         }
     }
     
-    private func updateThumbnailImage(to marketItem: MarketPageItem) {
-        for thumbnail in marketItem.thumbnails {
-            if let data = ImageManager.shared.loadImageData(imageUrl: thumbnail) {
-                itemThumbnailImageView.image = UIImage(data: data)
-                return
-            }
-            if let url = URL(string: thumbnail),
-               let data = try? Data(contentsOf: url) {
-                itemThumbnailImageView.image = UIImage(data: data)
-                ImageManager.shared.cacheImagData(imageUrl: thumbnail, data: data)
-                return
-            }
-        }
-        
-        if let data = ImageManager.shared.loadImageData(imageUrl: ImageManager.shared.noImageDataUrl) {
-            itemThumbnailImageView.image = UIImage(data: data)
-            return
-        }
+    func updateThumbnailImage(to image: UIImage?) {
+        itemThumbnailImageView.image = image
     }
 }

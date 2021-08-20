@@ -9,33 +9,31 @@ import UIKit
 class ItemListViewController: UIViewController {
     private let apiClient = ApiClient()
     private var itemList: [MarketPageItem] = []
-    private var nextItemList: [MarketPageItem] = []
     private var nextPage = 1
-    private var isFeching = false
+    
+    var list: [ThumbnailManger] = []
+    var downloadTasks: [URLSessionTask] = []
     
     @IBOutlet private weak var loadingIndicator: UIActivityIndicatorView!
     @IBOutlet private weak var marketItemListCollectionView: UICollectionView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        marketItemListCollectionView.prefetchDataSource = self
         designLayout()
         fetchItemList()
     }
     
     private func fetchItemList() {
-        guard !isFeching else {
-            return
-        }
-        
-        isFeching = true
         apiClient.getMarketPageItems(for: nextPage) { result in
             switch result {
             case .success(let marketPageItem):
                 if marketPageItem.items.count > 0 {
-                    for item in marketPageItem.items {
-                        ImageManager.shared.performBatchUpdate(urls: item.thumbnails)
-                    }
+//                    for item in marketPageItem.items {
+//                        ImageManager.shared.performBatchUpdate(urls: item.thumbnails)
+//                    }
                     
+                    self.list = marketPageItem.items.map { ThumbnailManger(urlString: $0.thumbnails[0]) }
                     self.itemList += marketPageItem.items
                     self.nextPage = marketPageItem.page + 1
                     
@@ -46,38 +44,6 @@ class ItemListViewController: UIViewController {
                 }
             case .failure(let error):
                 self.handleError(error)
-            }
-            
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                self.isFeching = false
-                self.fetchNextItemList()
-            }
-        }
-    }
-    
-    private func fetchNextItemList() {
-        guard !isFeching else {
-            return
-        }
-        
-        isFeching = true
-        apiClient.getMarketPageItems(for: nextPage) { result in
-            switch result {
-            case .success(let marketPageItem):
-                if marketPageItem.items.count > 0 {
-                    for item in marketPageItem.items {
-                        ImageManager.shared.performBatchUpdate(urls: item.thumbnails)
-                    }
-                    
-                    self.nextItemList = marketPageItem.items
-                    self.nextPage = marketPageItem.page + 1
-                }
-            case .failure(let error):
-                self.handleError(error)
-            }
-            
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                self.isFeching = false
             }
         }
     }
@@ -130,22 +96,72 @@ extension ItemListViewController: UICollectionViewDataSource {
         let marketItem = itemList[indexPath.item]
         cell.configure(with: marketItem)
         
+        if let image = list[indexPath.row].image { // image: UIImage // kind of Cache
+            cell.updateThumbnailImage(to: image)
+        } else {
+            cell.updateThumbnailImage(to: nil)
+            downloadImage(at: indexPath.row)
+        }
+        
         return cell
     }
 }
 
 extension ItemListViewController: UICollectionViewDelegate {
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard !isFeching else {
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if let cell = cell as? ItemCollectionViewCell {
+            if let image = list[indexPath.row].image { // image: UIImage // kind of Cache
+                cell.updateThumbnailImage(to: image)
+            } else {
+                cell.updateThumbnailImage(to: nil)
+                downloadImage(at: indexPath.row)
+            }
+        }
+    }
+}
+
+extension ItemListViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        for indexPath in indexPaths {
+            downloadImage(at: indexPath.item)
+        }
+    }
+}
+
+extension ItemListViewController {
+    func downloadImage(at index: Int) {
+        guard list[index].image == nil else {
             return
         }
         
-        let position = scrollView.contentOffset.y
-        if position > (marketItemListCollectionView.contentSize.height - scrollView.frame.height) {
-            itemList += nextItemList
-            nextItemList = []
-            marketItemListCollectionView.reloadData()
-            fetchNextItemList()
+        let targetUrl = list[index].url
+        guard !downloadTasks.contains(where: { $0.originalRequest?.url == targetUrl }) else {
+            return
         }
+        
+        let task = URLSession.shared.dataTask(with: targetUrl) { (data, response, error) in
+            if let _ = error {
+                return
+            }
+            
+            if let data = data, let image = UIImage(data: data) {
+                self.list[index].image = image // 캐싱.
+                let reloadTargetIndexPath = IndexPath(row: index, section: 0)
+                DispatchQueue.main.async {
+                    if self.marketItemListCollectionView.indexPathsForVisibleItems.contains(reloadTargetIndexPath) == .some(true) {
+                        self.marketItemListCollectionView.reloadItems(at: [reloadTargetIndexPath])
+                    }
+                }
+                
+                self.completeTask()
+            }
+        }
+        task.resume()
+        downloadTasks.append(task)
+    }
+    
+    
+    func completeTask() {
+        downloadTasks = downloadTasks.filter { $0.state != .completed }
     }
 }
